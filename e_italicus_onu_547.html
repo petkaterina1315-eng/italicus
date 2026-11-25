@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Біоінформатичний супровід дослідження бактеріоцину Enterococcus italicus ONU 547</title>
+
+  <!-- Google Fonts: Manrope (заголовки), Inter (основний текст), JetBrains Mono (послідовності та дані) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            olive: {
+              DEFAULT: '#556B2F',
+              dark: '#3F5122',
+              light: '#748C48',
+              soft: '#EEF2EA',
+              mist: '#F7F9F5',
+            },
+            sage: {
+              DEFAULT: '#657260',
+              light: '#8B9A85',
+              pale: '#DCE4D7',
+            },
+            graphite: '#1F2922',
+            goldolive: '#9A8B4F',
+            tealsage: '#467472',
+          },
+          fontFamily: {
+            display: ['Manrope', 'sans-serif'],
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          boxShadow: {
+            stage: '0 24px 60px -16px rgba(31, 41, 34, 0.12), 0 4px 16px -4px rgba(85, 107, 47, 0.08)',
+            card: '0 8px 24px -8px rgba(31, 41, 34, 0.06)',
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    /* Базові налаштування інтерфейсу презентації */
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background-color: #F7F9F5;
+      color: #1F2922;
+      font-family: 'Inter', sans-serif;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Анімований молекулярний фон */
+    #molecular-bg {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Контейнер 16:9 на великих екранах та адаптивний на мобільних */
+    .slide-stage {
+      width: 100%;
+      max-width: 1220px;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(101, 114, 96, 0.16);
+      position: relative;
+      overflow: hidden;
+    }
+
+    @media (min-width: 1024px) {
+      .slide-stage {
+        aspect-ratio: 16 / 9;
+        max-height: calc(100vh - 110px);
+      }
+    }
+
+    /* Переходи між слайдами та поетапна поява елементів */
+    .slide {
+      display: none;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+    }
+
+    .slide.active {
+      display: flex;
+      flex-direction: column;
+      animation: slideFadeIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
+    @keyframes slideFadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.992);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .slide.active .anim-item {
+      opacity: 0;
+      transform: translateY(14px);
+      animation: itemReveal 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
+    .slide.active .delay-1 { animation-delay: 0.06s; }
+    .slide.active .delay-2 { animation-delay: 0.14s; }
+    .slide.active .delay-3 { animation-delay: 0.22s; }
+    .slide.active .delay-4 { animation-delay: 0.30s; }
+    .slide.active .delay-5 { animation-delay: 0.38s; }
+    .slide.active .delay-6 { animation-delay: 0.46s; }
+
+    @keyframes itemReveal {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Анімація заповнення шкал BLAST */
+    .blast-bar-fill {
+      width: 0%;
+      transition: width 1s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    /* Анімація ліній філогенетичного дерева */
+    .phylo-line {
+      stroke-dasharray: 400;
+      stroke-dashoffset: 400;
+      transition: stroke-dashoffset 1.1s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .slide.active .phylo-line {
+      stroke-dashoffset: 0;
+    }
+
+    /* Плавне обертання декоративної ДНК на 1 слайді */
+    @keyframes floatSlow {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-8px); }
+    }
+
+    .float-slow {
+      animation: floatSlow 6s ease-in-out infinite;
+    }
+
+    /* Інтерактивні стрілки генів у antiSMASH */
+    .gene-arrow {
+      cursor: pointer;
+      transition: transform 0.22s ease, filter 0.22s ease;
+    }
+
+    .gene-arrow:hover,
+    .gene-arrow.selected {
+      transform: translateY(-3px);
+      filter: drop-shadow(0 6px 10px rgba(85, 107, 47, 0.28));
+    }
+
+    /* Тонкий скролбар всередині слайду на малих екранах */
+    .slide-scroll::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    .slide-scroll::-webkit-scrollbar-thumb {
+      background: rgba(101, 114, 96, 0.3);
+      border-radius: 999px;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-olive/20 selection:text-graphite">
+
+  <!-- Анімований Canvas-фон із молекулярними вузлами -->
+  <canvas id="molecular-bg" aria-hidden="true"></canvas>
+
+  <!-- Основна зона відображення слайду -->
+  <main class="relative z-10 flex-1 flex items-center justify-center px-3 py-4 sm:px-6 sm:py-5">
+    <div id="presentation-stage" class="slide-stage rounded-3xl shadow-stage flex flex-col">
+
+      <!-- ========================================================= -->
+      <!-- СЛАЙД 1: ТИТУЛЬНИЙ -->
+      <!-- ========================================================= -->
+      <section class="slide active p-6 sm:p-10 lg:p-14 justify-between relative overflow-y-auto slide-scroll" data-title="Титульний слайд">
+        <!-- Декоративний м'який градієнт у кутку -->
+        <div class="pointer-events-none absolute -top-24 -right-24 w-96 h-96 rounded-full bg-olive/10 blur-3xl"></div>
+        <div class="pointer-events-none absolute -bottom-24 -left-24 w-80 h-80 rounded-full bg-sage-pale/50 blur-3xl"></div>
+
+        <!-- Надзаголовок університету -->
+        <div class="anim-item delay-1 relative z-10 flex items-center gap-3">
+          <span class="w-2.5 h-2.5 rounded-full bg-olive shrink-0"></span>
+          <p class="text-[11px] sm:text-xs font-medium tracking-wide uppercase text-sage">
+            Одеський національний університет імені І. І. Мечникова • Біологічний факультет • Кафедра мікробіології, вірусології та біотехнології
+          </p>
+        </div>
+
+        <!-- Центральна частина з заголовком та векторною ДНК -->
+        <div class="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center my-6 lg:my-0">
+          <div class="lg:col-span-8 space-y-5">
+            <h1 class="anim-item delay-2 font-display text-2xl sm:text-4xl lg:text-[2.65rem] font-extrabold leading-[1.16] text-graphite tracking-tight">
+              Біоінформатичний супровід дослідження бактеріоцину
+              <span class="italic text-olive">Enterococcus italicus</span>
+              <span class="text-olive">ONU 547</span>
+            </h1>
+
+            <p class="anim-item delay-3 text-base sm:text-lg lg:text-xl text-sage font-normal leading-relaxed max-w-2xl">
+              Застосування методів <span class="italic">in silico</span> у кваліфікаційній роботі бакалавра з біотехнології та біоінженерії
+            </p>
+          </div>
+
+          <!-- Мінімалістична векторна спіраль ДНК / молекулярна структура -->
+          <div class="anim-item delay-4 lg:col-span-4 flex justify-center">
+            <div class="float-slow w-44 h-44 sm:w-56 sm:h-56 lg:w-64 lg:h-64 rounded-full bg-olive-mist border border-sage-pale flex items-center justify-center p-5 shadow-card">
+              <svg viewBox="0 0 220 220" class="w-full h-full" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Стилізована спіраль ДНК">
+                <!-- Подвійна спіраль -->
+                <path d="M55 25 C145 55, 145 95, 55 125 C-5 145, 55 175, 165 195" stroke="#556B2F" stroke-width="3.5" stroke-linecap="round" />
+                <path d="M165 25 C75 55, 75 95, 165 125 C225 145, 165 175, 55 195" stroke="#8B9A85" stroke-width="3.5" stroke-linecap="round" />
+                <!-- Поперечні пари основ -->
+                <line x1="76" y1="44" x2="144" y2="44" stroke="#9A8B4F" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="4 4" />
+                <line x1="94" y1="68" x2="126" y2="68" stroke="#556B2F" stroke-width="2.5" stroke-linecap="round" />
+                <line x1="88" y1="96" x2="132" y2="96" stroke="#467472" stroke-width="2.5" stroke-linecap="round" />
+                <line x1="68" y1="122" x2="152" y2="122" stroke="#9A8B4F" stroke-width="2.5" stroke-linecap="round" />
+                <line x1="60" y1="150" x2="160" y2="150" stroke="#556B2F" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="4 4" />
+                <line x1="82" y1="176" x2="138" y2="176" stroke="#467472" stroke-width="2.5" stroke-linecap="round" />
+                <!-- Вузли нуклеотидів -->
+                <circle cx="55" cy="25" r="5.5" fill="#556B2F" />
+                <circle cx="165" cy="25" r="5.5" fill="#8B9A85" />
+                <circle cx="110" cy="75" r="6" fill="#9A8B4F" />
+                <circle cx="55" cy="125" r="5.5" fill="#556B2F" />
+                <circle cx="165" cy="125" r="5.5" fill="#467472" />
+                <circle cx="165" cy="195" r="5.5" fill="#556B2F" />
+                <circle cx="55" cy="195" r="5.5" fill="#8B9A85" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Нижня панель титульного слайду -->
+        <div class="anim-item delay-5 relative z-10 pt-5 border-t border-sage-pale/70 flex flex-wrap items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-olive-soft text-olive font-display font-bold flex items-center justify-center text-sm">
+              КП
+            </div>
+            <div>
+              <p class="font-display font-bold text-graphite text-sm sm:text-base">Катерина Петренко</p>
+              <p class="text-xs sm:text-sm text-sage">Студентка 4 курсу спеціальності «Біотехнології та біоінженерія»</p>
+            </div>
+          </div>
+          <div class="px-4 py-1.5 rounded-full bg-olive-soft border border-sage-pale text-olive text-xs font-semibold tracking-wide">
+            Одеса • 2026
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================= -->
+      <!-- СЛАЙД 2: АКТУАЛЬНІСТЬ ТА ОБ'ЄКТ ДОСЛІДЖЕННЯ -->
+      <!-- ========================================================= -->
+      <section class="slide p-6 sm:p-10 lg:p-12 justify-between overflow-y-auto slide-scroll" data-title="Актуальність та об'єкт дослідження">
+        <div>
+          <div class="anim-item delay-1 flex items-center gap-3 mb-2">
+            <span class="px-3 py-1 rounded-full bg-olive-soft text-olive font-mono text-xs font-semibold">02</span>
+            <span class="text-xs uppercase tracking-widest text-sage font-medium">ВООЗ 2025 • Об'єкт дослідження</span>
+          </div>
+          <h2 class="anim-item delay-1 font-display text-2xl sm:text-3xl lg:text-[2.1rem] font-extrabold text-graphite tracking-tight">
+            Актуальність та об'єкт дипломного дослідження
+          </h2>
+        </div>
+
+        <!-- 3 статистичні картки ВООЗ (без двокрапок) -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 my-5">
+          <div class="anim-item delay-2 rounded-2xl bg-olive-mist border border-sage-pale/80 p-5 flex flex-col justify-between shadow-card">
+            <div class="font-display text-3xl sm:text-4xl font-extrabold text-olive tracking-tight">1,27 млн</div>
+            <p class="mt-2 text-sm text-graphite/85 leading-snug">
+              смертей щороку спричиняє антибіотикорезистентність
+            </p>
+          </div>
+          <div class="anim-item delay-3 rounded-2xl bg-olive-mist border border-sage-pale/80 p-5 flex flex-col justify-between shadow-card">
+            <div class="font-display text-3xl sm:text-4xl font-extrabold text-goldolive tracking-tight">10 млн</div>
+            <p class="mt-2 text-sm text-graphite/85 leading-snug">
+              прогнозована кількість смертей на рік до 2050 року
+            </p>
+          </div>
+          <div class="anim-item delay-4 rounded-2xl bg-olive-mist border border-sage-pale/80 p-5 flex flex-col justify-between shadow-card">
+            <div class="font-display text-3xl sm:text-4xl font-extrabold text-tealsage tracking-tight">1 з 6</div>
+            <p class="mt-2 text-sm text-graphite/85 leading-snug">
+              бактеріальних інфекцій вже стійка до стандартного лікування
+            </p>
+          </div>
+        </div>
+
+        <!-- 3 лаконічні пункти тексту (без двокрапок) -->
+        <div class="space-y-3.5">
+          <div class="anim-item delay-4 flex items-start gap-3.5 bg-white rounded-2xl p-4 border border-sage-pale/60">
+            <span class="mt-1.5 w-2.5 h-2.5 rounded-full bg-olive shrink-0"></span>
+            <p class="text-sm sm:text-base text-graphite leading-relaxed">
+              Бактеріоцини є рибосомально синтезованими антимікробними пептидами, які розглядаються як перспективна альтернатива класичним антибіотикам.
+            </p>
+          </div>
+          <div class="anim-item delay-5 flex items-start gap-3.5 bg-white rounded-2xl p-4 border border-sage-pale/60">
+            <span class="mt-1.5 w-2.5 h-2.5 rounded-full bg-olive shrink-0"></span>
+            <p class="text-sm sm:text-base text-graphite leading-relaxed">
+              Штам <span class="italic font-medium">Enterococcus italicus</span> ONU 547, виділений із тайської ферментованої капусти, продукує катіонний, гідрофобний і термостабільний бактеріоцин.
+            </p>
+          </div>
+          <div class="anim-item delay-6 flex items-start gap-3.5 bg-white rounded-2xl p-4 border border-sage-pale/60">
+            <span class="mt-1.5 w-2.5 h-2.5 rounded-full bg-olive shrink-0"></span>
+            <p class="text-sm sm:text-base text-graphite leading-relaxed">
+              Очищений пептид пригнічує збудників ранових інфекцій (<span class="italic">P. aeruginosa</span> B-329, <span class="italic">K. pneumoniae</span> ATCC 10031, <span class="italic">E. faecalis</span> ATCC 29212, <span class="italic">L. ivanovii</span> DSMZ 20750) та знижує формування біоплівок.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================= -->
+      <!-- СЛАЙД 3: РОЛЬ БІОІНФОРМАТИКИ У ДОСЛІДЖЕННІ БАКТЕРІОЦИНУ -->
+      <!-- ========================================================= -->
+      <section class="slide p-6 sm:p-10 lg:p-12 justify-between overflow-y-auto slide-scroll" data-title="Роль біоінформатики у дослідженні">
+        <div>
+          <div class="anim-item delay-1 flex items-center gap-3 mb-2">
+            <span class="px-3 py-1 rounded-full bg-olive-soft text-olive font-mono text-xs font-semibold">03</span>
+            <span class="text-xs uppercase tracking-widest text-sage font-medium">Синергія експерименту та обчислень</span>
+          </div>
+          <h2 class="anim-item delay-1 font-display text-2xl sm:text-3xl lg:text-[2.1rem] font-extrabold text-graphite tracking-tight">
+            Роль біоінформатики у дослідженні бактеріоцину
+          </h2>
+        </div>
+
+        <!-- Порівняння двох колонок -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 my-auto py-4">
+          <!-- Ліва картка: in vitro -->
+          <div class="anim-item delay-2 rounded-3xl bg-olive-mist border border-sage-pale p-6 sm:p-7 flex flex-col justify-between shadow-card">
+            <div>
+              <div class="flex items-center gap-3 mb-5">
+                <div class="w-11 h-11 rounded-2xl bg-white border border-sage-pale flex items-center justify-center text-sage">
+                  <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 3h6m-5 0v5.172a2 2 0 01-.586 1.414L4.828 14.172A4 4 0 007.657 21h8.686a4 4 0 002.829-6.828l-4.586-4.586A2 2 0 0114 8.172V3" />
+                  </svg>
+                </div>
+                <h3 class="font-display text-lg sm:text-xl font-bold text-graphite">
+                  Експериментальний етап <span class="italic font-semibold text-sage">in vitro</span>
+                </h3>
+              </div>
+
+              <ul class="space-y-4">
+                <li class="flex items-start gap-3">
+                  <span class="mt-1.5 w-2 h-2 rounded-full bg-sage shrink-0"></span>
+                  <p class="text-sm sm:text-base text-graphite/90 leading-relaxed">
+                    Осадження 90% сульфатом амонію та діаліз культурної рідини.
+                  </p>
+                </li>
+                <li class="flex items-start gap-3">
+                  <span class="mt-1.5 w-2 h-2 rounded-full bg-sage shrink-0"></span>
+                  <p class="text-sm sm:text-base text-graphite/90 leading-relaxed">
+                    Аніонообмінна хроматографія на системі BioLogic LP та оцінка маси методом SDS-PAGE.
+                  </p>
+                </li>
+                <li class="flex items-start gap-3">
+                  <span class="mt-1.5 w-2 h-2 rounded-full bg-sage shrink-0"></span>
+                  <p class="text-sm sm:text-base text-graphite/90 leading-relaxed">
+                    Визначення антимікробного спектра мікропланшетним турбідиметричним методом.
+                  </p>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Права картка: in silico -->
+          <div class="anim-item delay-3 rounded-3xl bg-white border-2 border-olive/35 p-6 sm:p-7 flex flex-col justify-between shadow-card relative overflow-hidden">
+            <div class="pointer-events-none absolute -top-12 -right-12 w-36 h-36 rounded-full bg-olive/10 blur-2xl"></div>
+            <div class="relative z-10">
+              <div class="flex items-center gap-3 mb-5">
+                <div class="w-11 h-11 rounded-2xl bg-olive text-white flex items-center justify-center">
+                  <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3v2.25M14.25 3v2.25M9.75 18.75V21M14.25 18.75V21M3 9.75h2.25M3 14.25h2.25M18.75 9.75H21M18.75 14.25H21M6.75 6.75h10.5v10.5H6.75V6.75z" />
+                  </svg>
+                </div>
+                <h3 class="font-display text-lg sm:text-xl font-bold text-olive">
+                  Біоінформатичний етап <span class="italic font-semibold">in silico</span>
+                </h3>
+              </div>
+
+              <ul class="space-y-4">
+                <li class="flex items-start gap-3">
+                  <span class="mt-1.5 w-2 h-2 rounded-full bg-olive shrink-0"></span>
+                  <p class="text-sm sm:text-base text-graphite leading-relaxed">
+                    Точна таксономічна ідентифікація штаму-продуцента за геном 16S рРНК.
+                  </p>
+                </li>
+                <li class="flex items-start gap-3">
+                  <span class="mt-1.5 w-2 h-2 rounded-full bg-olive shrink-0"></span>
+                  <p class="text-sm sm:text-base text-graphite leading-relaxed">
+                    Пошук біосинтетичних кластерів генів у повному геномі та підтвердження новизни пептиду.
+                  </p>
+                </li>
+                <li class="flex items-start gap-3">
+                  <span class="mt-1.5 w-2 h-2 rounded-full bg-olive shrink-0"></span>
+                  <p class="text-sm sm:text-base text-graphite leading-relaxed">
+                    Прогнозування фізико-хімічних параметрів і структури для оптимізації очищення.
+                  </p>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="anim-item delay-4 text-center">
+          <span class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-olive-soft text-olive text-xs sm:text-sm font-medium">
+            Обчислювальний аналіз спрямовує лабораторний експеримент та скорочує витрати на підбір умов очищення
+          </span>
+        </div>
+      </section>
+
+      <!-- ========================================================= -->
+      <!-- СЛАЙД 4: ПОШУК ГОМОЛОГІВ У BLAST -->
+      <!-- ========================================================= -->
+      <section class="slide p-6 sm:p-10 lg:p-12 justify-between overflow-y-auto slide-scroll" data-title="Пошук гомологів у BLAST">
+        <div>
+          <div class="anim-item delay-1 flex items-center gap-3 mb-2">
+            <span class="px-3 py-1 rounded-full bg-olive-soft text-olive font-mono text-xs font-semibold">04</span>
+            <span class="text-xs uppercase tracking-widest text-sage font-medium">NCBI • BLASTn & BLASTp</span>
+          </div>
+          <h2 class="anim-item delay-1 font-display text-2xl sm:text-3xl lg:text-[2.1rem] font-extrabold text-graphite tracking-tight">
+            Пошук гомологів за допомогою BLAST
+          </h2>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-7 items-center my-auto py-3">
+          <!-- Текстові пункти ліворуч -->
+          <div class="lg:col-span-6 space-y-4">
+            <div class="anim-item delay-2 flex items-start gap-3.5 bg-olive-mist/70 rounded-2xl p-4 border border-sage-pale/70">
+              <span class="mt-1.5 w-2.5 h-2.5 rounded-full bg-olive shrink-0"></span>
+              <p class="text-sm sm:text-[15px] text-graphite leading-relaxed">
+                Алгоритм BLASTn використовується для порівняння послідовності гена 16S рРНК штаму <span class="italic">E. italicus</span> ONU 547 із базою даних NCBI з метою точної видової ідентифікації та відбору референсних штамів.
+              </p>
+            </div>
+            <div class="anim-item delay-3 flex items-start gap-3.5 bg-olive-mist/70 rounded-2xl p-4 border border-sage-pale/70">
+              <span class="mt-1.5 w-2.5 h-2.5 rounded-full bg-olive shrink-0"></span>
+              <p class="text-sm sm:text-[15px] text-graphite leading-relaxed">
+                Пошук у BLASTp дозволяє перевірити амінокислотні послідовності відкритих рамок зчитування всередині кластера на подібність до описаних ентероцинів A і B.
+              </p>
+            </div>
+            <div class="anim-item delay-4 flex items-start gap-3.5 bg-olive-mist/70 rounded-2xl p-4 border border-sage-pale/70">
+              <span class="mt-1.5 w-2.5 h-2.5 rounded-full bg-olive shrink-0"></span>
+              <p class="text-sm sm:text-[15px] text-graphite leading-relaxed">
+                Оцінка показників E-value, Query Cover та Percent Identity підтверджує унікальність досліджуваного пептиду або виявляє його найближчих функціональних гомологів.
+              </p>
+            </div>
+          </div>
+
+          <!-- Візуальний блок BLAST праворуч -->
+          <div class="anim-item delay-4 lg:col-span-6 rounded-3xl bg-olive-mist border border-sage-pale p-5 sm:p-6 shadow-card">
+            <div class="flex items-center justify-between mb-4 pb-3 border-b border-sage-pale/80">
+              <span class="font-display font-bold text-sm text-graphite">Порівняння покриття та ідентичності (16S rRNA)</span>
+              <span class="font-mono text-[11px] px-2.5 py-1 rounded-lg bg-white text-olive border border-sage-pale">E-value 0.0</span>
+            </div>
+
+            <div class="space-y-5">
+              <!-- Шкала 1 -->
+              <div class="group p-3 rounded-2xl bg-white border border-olive/30 transition hover:border-olive">
+                <div class="flex items-center justify-between text-xs sm:text-sm mb-2">
+                  <span class="font-semibold text-olive italic">E. italicus ONU 547 (Query)</span>
+                  <span class="font-mono text-xs text-olive font-semibold">100% Cover • 100% Ident</span>
+                </div>
+                <div class="w-full h-3.5 rounded-full bg-olive-soft overflow-hidden">
+                  <div class="blast-bar-fill h-full rounded-full bg-olive" data-target="100%"></div>
+                </div>
+              </div>
+
+              <!-- Шкала 2 -->
+              <div class="group p-3 rounded-2xl bg-white border border-sage-pale/80 transition hover:border-sage">
+                <div class="flex items-center justify-between text-xs sm:text-sm mb-2">
+                  <span class="font-medium text-graphite italic">E. italicus SDKGW24</span>
+                  <span class="font-mono text-xs text-sage font-semibold">99% Cover • 99.6% Ident</span>
+                </div>
+                <div class="w-full h-3.5 rounded-full bg-olive-soft overflow-hidden">
+                  <div class="blast-bar-fill h-full rounded-full bg-olive-light" data-target="96%"></div>
+                </div>
+              </div>
+
+              <!-- Шкала 3 -->
+              <div class="group p-3 rounded-2xl bg-white border border-sage-pale/80 transition hover:border-sage">
+                <div class="flex items-center justify-between text-xs sm:text-sm mb-2">
+                  <span class="font-medium text-graphite italic">E. italicus CAU7522</span>
+                  <span class="font-mono text-xs text-sage font-semibold">98% Cover • 99.1% Ident</span>
+                </div>
+                <div class="w-full h-3.5 rounded-full bg-olive-soft overflow-hidden">
+                  <div class="blast-bar-fill h-full rounded-full bg-tealsage" data-target="92%"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Шкала координат нуклеотидів -->
+            <div class="mt-4 pt-3 border-t border-sage-pale/70 flex justify-between font-mono text-[11px] text-sage">
+              <span>1 bp</span>
+              <span>400 bp</span>
+              <span>800 bp</span>
+              <span>1200 bp</span>
+              <span>1500 bp</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================= -->
+      <!-- СЛАЙД 5: МНОЖИННЕ ВИРІВНЮВАННЯ У CLUSTAL OMEGA -->
+      <!-- ========================================================= -->
+      <section class="slide p-6 sm:p-10 lg:p-12 justify-between overflow-y-auto slide-scroll" data-title="Множинне вирівнювання у Clustal Omega">
+        <div>
+          <div class="anim-item delay-1 flex items-center gap-3 mb-2">
+            <span class="px-3 py-1 rounded-full bg-olive-soft text-olive font-mono text-xs font-semibold">05</span>
+            <span class="text-xs uppercase tracking-widest text-sage font-medium">EMBL-EBI • Multiple Sequence Alignment</span>
+          </div>
+          <h2 class="anim-item delay-1 font-display text-2xl sm:text-3xl lg:text-[2.1rem] font-extrabold text-graphite tracking-tight">
+            Множинне вирівнювання у Clustal Omega
+          </h2>
+        </div>
+
+        <!-- 3 пункти тексту -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 my-4">
+          <div class="anim-item delay-2 rounded-2xl bg-olive-mist/80 border border-sage-pale p-4">
+            <p class="text-sm text-graphite leading-relaxed">
+              Множинне вирівнювання у Clustal Omega або ClustalW забезпечує порівняння послідовностей 16S рРНК досліджуваного штаму зі спорідненими ізолятами роду <span class="italic">Enterococcus</span>.
+            </p>
+          </div>
+          <div class="anim-item delay-3 rounded-2xl bg-olive-mist/80 border border-sage-pale p-4">
+            <p class="text-sm text-graphite leading-relaxed">
+              Попереднє обрізання нерівних кінців послідовностей усуває артефакти секвенування та підвищує точність подальшого філогенетичного аналізу.
+            </p>
+          </div>
+          <div class="anim-item delay-4 rounded-2xl bg-olive-mist/80 border border-sage-pale p-4">
+            <p class="text-sm text-graphite leading-relaxed">
+              Вирівнювання білкових послідовностей бактеріоцинів допомагає знаходити консервативні функціональні мотиви та сайти відщеплення лідерного пептиду.
+            </p>
+          </div>
+        </div>
+
+        <!-- Стилізована кольорова матриця вирівнювання -->
+        <div class="anim-item delay-5 rounded-3xl bg-white border border-sage-pale p-4 sm:p-5 shadow-card overflow-x-auto">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <span class="font-display font-bold text-xs sm:text-sm text-graphite">Фрагмент вирівнювання консервативної ділянки 16S рРНК</span>
+            <div class="flex items-center gap-2 text-[11px] font-mono">
+              <span class="px-2 py-0.5 rounded bg-[#E7EFE0] text-[#3F5122] font-semibold">A</span>
+              <span class="px-2 py-0.5 rounded bg-[#F5EFE0] text-[#7A6A33] font-semibold">T</span>
+              <span class="px-2 py-0.5 rounded bg-[#E2EFEF] text-[#2F5B59] font-semibold">G</span>
+              <span class="px-2 py-0.5 rounded bg-[#EDEBE8] text-[#57534E] font-semibold">C</span>
+            </div>
+          </div>
+
+          <div id="msa-matrix" class="font-mono text-xs sm:text-sm space-y-1.5 min-w-[540px]">
+            <!-- Генерується через JS для ідеального вирівнювання і кольорової підсвітки -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================= -->
+      <!-- СЛАЙД 6: ФІЛОГЕНЕТИЧНЕ ДЕРЕВО ТА iTOL -->
+      <!-- ========================================================= -->
+      <section class="slide p-6 sm:p-10 lg:p-12 justify-between overflow-y-auto slide-scroll" data-title="Філогенетичний аналіз та iTOL">
+        <div>
+          <div class="anim-item delay-1 flex items-center gap-3 mb-2">
+            <span class="px-3 py-1 rounded-full bg-olive-soft text-olive font-mono text-xs font-semibold">06</span>
+            <span class="text-xs uppercase tracking-widest text-sage font-medium">Newick • Midpoint Rooting • iTOL</span>
+          </div>
+          <h2 class="anim-item delay-1 font-display text-2xl sm:text-3xl lg:text-[2.1rem] font-extrabold text-graphite tracking-tight">
+            Філогенетичний аналіз та візуалізація в iTOL
+          </h2>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-7 items-center my-auto py-3">
+          <!-- Текстовий блок ліворуч -->
+          <div class="lg:col-span-5 space-y-4">
+            <div class="anim-item delay-2 flex items-start gap-3.5 bg-olive-mist/70 rounded-2xl p-4 border border-sage-pale/70">
+              <span class="mt-1.5 w-2.5 h-2.5 rounded-full bg-olive shrink-0"></span>
+              <p class="text-sm sm:text-[15px] text-graphite leading-relaxed">
+                На основі вирівняних послідовностей 16S рРНК формується дерево у форматі Newick, яке відображає еволюційну спорідненість <span class="italic">E. italicus</span> ONU 547 з іншими штамами виду.
+              </p>
+            </div>
+            <div class="anim-item delay-3 flex items-start gap-3.5 bg-olive-mist/70 rounded-2xl p-4 border border-sage-pale/70">
+              <span class="mt-1.5 w-2.5 h-2.5 rounded-full bg-olive shrink-0"></span>
+              <p class="text-sm sm:text-[15px] text-graphite leading-relaxed">
+                Укорінення дерева за середньою точкою (midpoint rooting) у платформі iTOL забезпечує коректне відображення еволюційних дистанцій та кластерів.
+              </p>
+            </div>
+            <div class="anim-item delay-4 flex items-start gap-3.5 bg-olive-mist/70 rounded-2xl p-4 border border-sage-pale/70">
+              <span class="mt-1.5 w-2.5 h-2.5 rounded-full bg-olive shrink-0"></span>
+              <p class="text-sm sm:text-[15px] text-graphite leading-relaxed">
+                Порівняння філогенії генів бактеріоцинів із філогенією 16S рРНК дозволяє виявити випадки горизонтального перенесення генів між молочнокислими бактеріями.
+              </p>
+            </div>
+          </div>
+
+          <!-- Векторна SVG-кладограма праворуч -->
+          <div class="anim-item delay-4 lg:col-span-7 rounded-3xl bg-white border border-sage-pale p-5 sm:p-6 shadow-card">
+            <div class="flex items-center justify-between mb-2">
+              <span class="font-display font-bold text-xs sm:text-sm text-graphite">Реконструкція спорідненості роду <span class="italic">Enterococcus</span></span>
+              <span class="text-[11px] font-mono text-sage">Tree scale 0.01</span>
+            </div>
+
+            <svg viewBox="0 0 540 270" class="w-full h-auto" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Філогенетичне дерево Enterococcus italicus ONU 547">
+              <!-- Корінь та основні гілки -->
+              <path class="phylo-line" d="M25 145 H75" stroke="#8B9A85" stroke-width="2.5" stroke-linecap="round" />
+              <!-- Вертикаль розгалуження -->
+              <path class="phylo-line" d="M75 75 V225" stroke="#8B9A85" stroke-width="2.5" stroke-linecap="round" />
+
+              <!-- Аутгрупа E. faecalis -->
+              <path class="phylo-line" d="M75 225 H265" stroke="#8B9A85" stroke-width="2.5" stroke-linecap="round" />
+              <circle cx="265" cy="225" r="4.5" fill="#8B9A85" />
+              <text x="278" y="230" fill="#657260" font-family="Inter, sans-serif" font-size="13" font-style="italic">Enterococcus faecalis ATCC 29212</text>
+
+              <!-- Кластер E. italicus -->
+              <path class="phylo-line" d="M75 75 H135" stroke="#657260" stroke-width="2.5" stroke-linecap="round" />
+              <path class="phylo-line" d="M135 45 V165" stroke="#657260" stroke-width="2.5" stroke-linecap="round" />
+
+              <!-- Гілка IMAU11565 -->
+              <path class="phylo-line" d="M135 165 H255" stroke="#657260" stroke-width="2.5" stroke-linecap="round" />
+              <circle cx="255" cy="165" r="4.5" fill="#657260" />
+              <text x="268" y="170" fill="#1F2922" font-family="Inter, sans-serif" font-size="13" font-style="italic">Enterococcus italicus IMAU11565</text>
+
+              <!-- Підкластер верхній -->
+              <path class="phylo-line" d="M135 45 H190" stroke="#556B2F" stroke-width="2.8" stroke-linecap="round" />
+              <path class="phylo-line" d="M190 35 V115" stroke="#556B2F" stroke-width="2.8" stroke-linecap="round" />
+
+              <!-- Гілка CAU7522 -->
+              <path class="phylo-line" d="M190 115 H265" stroke="#657260" stroke-width="2.5" stroke-linecap="round" />
+              <circle cx="265" cy="115" r="4.5" fill="#657260" />
+              <text x="278" y="120" fill="#1F2922" font-family="Inter, sans-serif" font-size="13" font-style="italic">Enterococcus italicus CAU7522</text>
+
+              <!-- Найближча пара ONU 547 + SDKGW24 -->
+              <path class="phylo-line" d="M190 35 H225" stroke="#556B2F" stroke-width="3" stroke-linecap="round" />
+              <path class="phylo-line" d="M225 28 V72" stroke="#556B2F" stroke-width="3" stroke-linecap="round" />
+
+              <!-- Підсвічена гілка ONU 547 -->
+              <rect x="260" y="12" width="265" height="32" rx="10" fill="#EEF2EA" stroke="#556B2F" stroke-width="1.5" />
+              <path class="phylo-line" d="M225 28 H268" stroke="#556B2F" stroke-width="3.5" stroke-linecap="round" />
+              <circle cx="268" cy="28" r="5.5" fill="#556B2F" />
+              <text x="282" y="33" fill="#3F5122" font-family="Manrope, sans-serif" font-weight="700" font-size="13.5">E. italicus ONU 547</text>
+
+              <!-- Гілка SDKGW24 -->
+              <path class="phylo-line" d="M225 72 H265" stroke="#556B2F" stroke-width="2.5" stroke-linecap="round" />
+              <circle cx="265" cy="72" r="4.5" fill="#748C48" />
+              <text x="278" y="77" fill="#1F2922" font-family="Inter, sans-serif" font-size="13" font-style="italic">Enterococcus italicus SDKGW24</text>
+
+              <!-- Підписи bootstrap -->
+              <text x="142" y="40" fill="#556B2F" font-family="JetBrains Mono, monospace" font-size="10.5" font-weight="600">98</text>
+              <text x="196" y="30" fill="#556B2F" font-family="JetBrains Mono, monospace" font-size="10.5" font-weight="600">94</text>
+              <text x="82" y="70" fill="#657260" font-family="JetBrains Mono, monospace" font-size="10.5">100</text>
+
+              <!-- Шкала дистанції -->
+              <line x1="25" y1="254" x2="115" y2="254" stroke="#657260" stroke-width="2" />
+              <line x1="25" y1="249" x2="25" y2="259" stroke="#657260" stroke-width="2" />
+              <line x1="115" y1="249" x2="115" y2="259" stroke="#657260" stroke-width="2" />
+              <text x="58" y="248" fill="#657260" font-family="JetBrains Mono, monospace" font-size="10">0.01</text>
+            </svg>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================= -->
+      <!-- СЛАЙД 7: ОКРЕМИЙ ВИДІЛЕНИЙ БЛОК — ВЛАСНИЙ ДОСВІД antiSMASH -->
+      <!-- ========================================================= -->
+      <section class="slide p-6 sm:p-10 lg:p-11 justify-between relative overflow-y-auto slide-scroll bg-gradient-to-br from-[#F3F7EE] via-[#FAFBF8] to-[#EEF3E8] border-4 border-olive/30 rounded-3xl" data-title="Власний досвід у antiSMASH (ONU 547)" data-featured="true">
+        <!-- Верхній рядок із бейджем -->
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div class="anim-item delay-1 flex items-center gap-3 mb-2">
+              <span class="px-3 py-1 rounded-full bg-olive text-white font-mono text-xs font-semibold">07</span>
+              <span class="text-xs uppercase tracking-widest text-olive font-semibold">Власний біоінформатичний результат</span>
+            </div>
+            <h2 class="anim-item delay-1 font-display text-2xl sm:text-3xl lg:text-[2.05rem] font-extrabold text-graphite tracking-tight">
+              Повногеномний аналіз <span class="italic text-olive">E. italicus</span> ONU 547 у antiSMASH
+            </h2>
+          </div>
+
+          <div class="anim-item delay-2 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-olive text-white text-xs sm:text-sm font-semibold shadow-sm">
+            <span class="w-2 h-2 rounded-full bg-[#DCE9C6] animate-pulse"></span>
+            Вже виконано для штаму ONU 547
+          </div>
+        </div>
+
+        <!-- 3 пункти тексту -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 my-4">
+          <div class="anim-item delay-2 bg-white/95 rounded-2xl p-4 border border-olive/20 shadow-card">
+            <p class="text-sm text-graphite leading-relaxed">
+              Повногеномне секвенування штаму <span class="italic">E. italicus</span> ONU 547 проведено на платформі DNBseq (BGI Genomics Europe, Польща), після чого дані проаналізовано в системі antiSMASH.
+            </p>
+          </div>
+          <div class="anim-item delay-3 bg-white/95 rounded-2xl p-4 border border-olive/20 shadow-card">
+            <p class="text-sm text-graphite leading-relaxed">
+              У геномі виявлено невідомий біосинтетичний кластер <span class="font-semibold text-olive">Region 4.1</span>, який належить до класу <span class="font-semibold">RiPP-like</span> (рибосомально синтезовані та посттрансляційно модифіковані пептиди).
+            </p>
+          </div>
+          <div class="anim-item delay-4 bg-white/95 rounded-2xl p-4 border border-olive/20 shadow-card">
+            <p class="text-sm text-graphite leading-relaxed">
+              Відсутність повного збігу з відомими кластерами підтверджує новизну бактеріоцину та узгоджується з даними SDS-PAGE про його відмінність від ентероцинів A і B.
+            </p>
+          </div>
+        </div>
+
+        <!-- Інтерактивна схема кластера Region 4.1 RiPP-like -->
+        <div class="anim-item delay-5 bg-white rounded-3xl border border-olive/25 p-4 sm:p-5 shadow-card">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-1 rounded-lg bg-olive-soft text-olive font-mono text-xs font-semibold">Region 4.1</span>
+              <span class="font-display font-bold text-sm text-graphite">Карта біосинтетичного кластера RiPP-like</span>
+            </div>
+            <span class="text-xs text-sage">Наведіть або натисніть на стрілку гена для перегляду функції</span>
+          </div>
+
+          <!-- SVG-стрілки генів -->
+          <div class="w-full overflow-x-auto pb-1">
+            <svg viewBox="0 0 860 92" class="w-full min-w-[600px] h-auto" xmlns="http://www.w3.org/2000/svg">
+              <!-- Осьова лінія ДНК -->
+              <line x1="12" y1="46" x2="848" y2="46" stroke="#CBD5C4" stroke-width="3" stroke-linecap="round" />
+
+              <!-- Ген 1: Додатковий -->
+              <g class="gene-arrow" data-gene="0">
+                <polygon points="24,30 110,30 126,46 110,62 24,62" fill="#B7C2B1" />
+                <text x="68" y="50" text-anchor="middle" fill="#1F2922" font-family="JetBrains Mono, monospace" font-size="11" font-weight="600">orf_1</text>
+              </g>
+
+              <!-- Ген 2: Регуляторний -->
+              <g class="gene-arrow" data-gene="1">
+                <polygon points="142,30 236,30 254,46 236,62 142,62" fill="#467472" />
+                <text x="192" y="50" text-anchor="middle" fill="#FFFFFF" font-family="JetBrains Mono, monospace" font-size="11" font-weight="600">regR</text>
+              </g>
+
+              <!-- Ген 3: Основний біосинтетичний (RiPP-like core) -->
+              <g class="gene-arrow selected" data-gene="2">
+                <polygon points="274,25 432,25 454,46 432,67 274,67" fill="#556B2F" />
+                <text x="356" y="50" text-anchor="middle" fill="#FFFFFF" font-family="JetBrains Mono, monospace" font-size="12" font-weight="700">RiPP-core</text>
+              </g>
+
+              <!-- Ген 4: Додатковий / імунітет -->
+              <g class="gene-arrow" data-gene="3">
+                <polygon points="468,30 558,30 574,46 558,62 468,62" fill="#9A8B4F" />
+                <text x="515" y="50" text-anchor="middle" fill="#FFFFFF" font-family="JetBrains Mono, monospace" font-size="11" font-weight="600">immP</text>
+              </g>
+
+              <!-- Ген 5: Транспортний (ABC-транспортер) -->
+              <g class="gene-arrow" data-gene="4">
+                <polygon points="590,27 724,27 744,46 724,65 590,65" fill="#657260" />
+                <text x="660" y="50" text-anchor="middle" fill="#FFFFFF" font-family="JetBrains Mono, monospace" font-size="11" font-weight="600">abcT</text>
+              </g>
+
+              <!-- Ген 6: Додатковий -->
+              <g class="gene-arrow" data-gene="5">
+                <polygon points="838,30 772,30 756,46 772,62 838,62" fill="#B7C2B1" />
+                <text x="802" y="50" text-anchor="middle" fill="#1F2922" font-family="JetBrains Mono, monospace" font-size="11" font-weight="600">orf_6</text>
+              </g>
+            </svg>
+          </div>
+
+          <!-- Легенда + інтерактивна підказка -->
+          <div class="mt-3 pt-3 border-t border-sage-pale/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="flex flex-wrap items-center gap-3 text-xs text-sage">
+              <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-olive"></span>Основний біосинтетичний</span>
+              <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-sage"></span>Транспортний</span>
+              <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-tealsage"></span>Регуляторний</span>
+              <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-goldolive"></span>Захисний</span>
+              <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-[#B7C2B1]"></span>Додатковий</span>
+            </div>
+            <div id="gene-tooltip" class="px-3.5 py-2 rounded-xl bg-olive-soft border border-olive/20 text-xs sm:text-sm text-graphite font-medium max-w-md">
+              Основний біосинтетичний ген кластера RiPP-like відповідає за синтез попередника нового бактеріоцину.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================= -->
+      <!-- СЛАЙД 8: ПЕРСПЕКТИВНІ ІНСТРУМЕНТИ -->
+      <!-- ========================================================= -->
+      <section class="slide p-6 sm:p-10 lg:p-12 justify-between overflow-y-auto slide-scroll" data-title="Перспективні біоінформатичні інструменти">
+        <div>
+          <div class="anim-item delay-1 flex items-center gap-3 mb-2">
+            <span class="px-3 py-1 rounded-full bg-olive-soft text-olive font-mono text-xs font-semibold">08</span>
+            <span class="text-xs uppercase tracking-widest text-sage font-medium">Наступний етап in silico</span>
+          </div>
+          <h2 class="anim-item delay-1 font-display text-2xl sm:text-3xl lg:text-[2.1rem] font-extrabold text-graphite tracking-tight">
+            Перспективні інструменти для поглиблення роботи
+          </h2>
+        </div>
+
+        <!-- 3 елегантні картки в ряд -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 my-auto py-4">
+          <!-- BAGEL4 -->
+          <div class="anim-item delay-2 rounded-3xl bg-white border border-sage-pale p-6 sm:p-7 flex flex-col justify-between shadow-card hover:border-olive/50 transition">
+            <div>
+              <div class="w-12 h-12 rounded-2xl bg-olive-soft text-olive flex items-center justify-center mb-5">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15z" />
+                </svg>
+              </div>
+              <h3 class="font-display text-2xl font-extrabold text-olive mb-3">BAGEL4</h3>
+              <p class="text-sm sm:text-base text-graphite/90 leading-relaxed">
+                Дозволяє спеціалізовано аннотувати структурний ген бактеріоцину, гени імунітету та ABC-транспортера в межах виявленого регіону.
+              </p>
+            </div>
+            <div class="mt-6 pt-4 border-t border-sage-pale/60 text-xs font-mono text-sage">
+              Bacteriocin Genome Mining
+            </div>
+          </div>
+
+          <!-- ExPASy ProtParam -->
+          <div class="anim-item delay-3 rounded-3xl bg-white border border-sage-pale p-6 sm:p-7 flex flex-col justify-between shadow-card hover:border-olive/50 transition">
+            <div>
+              <div class="w-12 h-12 rounded-2xl bg-olive-soft text-tealsage flex items-center justify-center mb-5">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+                </svg>
+              </div>
+              <h3 class="font-display text-2xl font-extrabold text-tealsage mb-3">ExPASy ProtParam</h3>
+              <p class="text-sm sm:text-base text-graphite/90 leading-relaxed">
+                Розраховує теоретичну молекулярну масу, ізоелектричну точку та гідрофобність пептиду для точного підбору буферів під хроматографію.
+              </p>
+            </div>
+            <div class="mt-6 pt-4 border-t border-sage-pale/60 text-xs font-mono text-sage">
+              Physico-Chemical Properties
+            </div>
+          </div>
+
+          <!-- AlphaFold -->
+          <div class="anim-item delay-4 rounded-3xl bg-white border border-sage-pale p-6 sm:p-7 flex flex-col justify-between shadow-card hover:border-olive/50 transition">
+            <div>
+              <div class="w-12 h-12 rounded-2xl bg-olive-soft text-goldolive flex items-center justify-center mb-5">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
+                </svg>
+              </div>
+              <h3 class="font-display text-2xl font-extrabold text-goldolive mb-3">AlphaFold</h3>
+              <p class="text-sm sm:text-base text-graphite/90 leading-relaxed">
+                Моделює тривимірну просторову структуру пептиду для прогнозування механізму його взаємодії з мембранами патогенних бактерій.
+              </p>
+            </div>
+            <div class="mt-6 pt-4 border-t border-sage-pale/60 text-xs font-mono text-sage">
+              3D Structure Prediction
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================= -->
+      <!-- СЛАЙД 9: КОМПЛЕКСНИЙ АЛГОРИТМ ДОСЛІДЖЕННЯ -->
+      <!-- ========================================================= -->
+      <section class="slide p-6 sm:p-10 lg:p-12 justify-between overflow-y-auto slide-scroll" data-title="Комплексний алгоритм дослідження">
+        <div>
+          <div class="anim-item delay-1 flex items-center gap-3 mb-2">
+            <span class="px-3 py-1 rounded-full bg-olive-soft text-olive font-mono text-xs font-semibold">09</span>
+            <span class="text-xs uppercase tracking-widest text-sage font-medium">Інтегрований маршрут дослідження</span>
+          </div>
+          <h2 class="anim-item delay-1 font-display text-2xl sm:text-3xl lg:text-[2.1rem] font-extrabold text-graphite tracking-tight">
+            Комплексний алгоритм дослідження штаму ONU 547
+          </h2>
+        </div>
+
+        <!-- Горизонтальний покроковий таймлайн із 5 карток -->
+        <div class="my-auto py-4 relative">
+          <!-- З'єднувальна лінія на десктопі -->
+          <div class="hidden lg:block absolute top-11 left-10 right-10 h-0.5 bg-gradient-to-r from-sage-pale via-olive/50 to-sage-pale z-0"></div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 relative z-10">
+            <div class="anim-item delay-2 rounded-2xl bg-white border border-sage-pale p-5 shadow-card flex flex-col">
+              <div class="w-11 h-11 rounded-2xl bg-olive-soft text-olive font-display font-extrabold text-lg flex items-center justify-center mb-4">
+                01
+              </div>
+              <p class="text-sm text-graphite leading-relaxed">
+                Виділення штаму та секвенування гена 16S рРНК і повного геному.
+              </p>
+            </div>
+
+            <div class="anim-item delay-3 rounded-2xl bg-white border border-sage-pale p-5 shadow-card flex flex-col">
+              <div class="w-11 h-11 rounded-2xl bg-olive-soft text-olive font-display font-extrabold text-lg flex items-center justify-center mb-4">
+                02
+              </div>
+              <p class="text-sm text-graphite leading-relaxed">
+                Пошук у BLAST, множинне вирівнювання у Clustal Omega та побудова дерева в iTOL.
+              </p>
+            </div>
+
+            <div class="anim-item delay-4 rounded-2xl bg-olive-mist border-2 border-olive/40 p-5 shadow-card flex flex-col">
+              <div class="w-11 h-11 rounded-2xl bg-olive text-white font-display font-extrabold text-lg flex items-center justify-center mb-4">
+                03
+              </div>
+              <p class="text-sm text-graphite font-medium leading-relaxed">
+                Виявлення унікального кластера Region 4.1 RiPP-like у antiSMASH та анотація в BAGEL4.
+              </p>
+            </div>
+
+            <div class="anim-item delay-5 rounded-2xl bg-white border border-sage-pale p-5 shadow-card flex flex-col">
+              <div class="w-11 h-11 rounded-2xl bg-olive-soft text-olive font-display font-extrabold text-lg flex items-center justify-center mb-4">
+                04
+              </div>
+              <p class="text-sm text-graphite leading-relaxed">
+                Прогнозування pI, маси та 3D-структури для оптимізації аніонообмінної хроматографії.
+              </p>
+            </div>
+
+            <div class="anim-item delay-6 rounded-2xl bg-white border border-sage-pale p-5 shadow-card flex flex-col sm:col-span-2 lg:col-span-1">
+              <div class="w-11 h-11 rounded-2xl bg-olive-soft text-olive font-display font-extrabold text-lg flex items-center justify-center mb-4">
+                05
+              </div>
+              <p class="text-sm text-graphite leading-relaxed">
+                Підтвердження антимікробної активності проти збудників ранових інфекцій <span class="italic">in vitro</span>.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================= -->
+      <!-- СЛАЙД 10: ВИСНОВКИ -->
+      <!-- ========================================================= -->
+      <section class="slide p-6 sm:p-10 lg:p-12 justify-between overflow-y-auto slide-scroll" data-title="Висновки">
+        <div>
+          <div class="anim-item delay-1 flex items-center gap-3 mb-2">
+            <span class="px-3 py-1 rounded-full bg-olive-soft text-olive font-mono text-xs font-semibold">10</span>
+            <span class="text-xs uppercase tracking-widest text-sage font-medium">Підсумки дослідження</span>
+          </div>
+          <h2 class="anim-item delay-1 font-display text-2xl sm:text-3xl lg:text-[2.1rem] font-extrabold text-graphite tracking-tight">
+            Висновки
+          </h2>
+        </div>
+
+        <div class="space-y-4 my-auto py-4">
+          <div class="anim-item delay-2 flex items-center gap-5 bg-white rounded-3xl p-5 sm:p-6 border border-sage-pale shadow-card">
+            <div class="w-12 h-12 rounded-2xl bg-olive-soft text-olive font-display font-extrabold text-xl flex items-center justify-center shrink-0">
+              1
+            </div>
+            <p class="text-base sm:text-lg text-graphite leading-relaxed">
+              Поєднання біоінформатичних методів (BLAST, Clustal Omega, iTOL, antiSMASH) із класичним очищенням формує цілісну доказову базу для дипломного дослідження.
+            </p>
+          </div>
+
+          <div class="anim-item delay-3 flex items-center gap-5 bg-olive-mist rounded-3xl p-5 sm:p-6 border border-olive/35 shadow-card">
+            <div class="w-12 h-12 rounded-2xl bg-olive text-white font-display font-extrabold text-xl flex items-center justify-center shrink-0">
+              2
+            </div>
+            <p class="text-base sm:text-lg text-graphite leading-relaxed">
+              Виконаний повногеномний аналіз у antiSMASH виявив невідомий кластер Region 4.1 RiPP-like, що підтверджує новизну бактеріоцину <span class="italic font-medium">E. italicus</span> ONU 547.
+            </p>
+          </div>
+
+          <div class="anim-item delay-4 flex items-center gap-5 bg-white rounded-3xl p-5 sm:p-6 border border-sage-pale shadow-card">
+            <div class="w-12 h-12 rounded-2xl bg-olive-soft text-olive font-display font-extrabold text-xl flex items-center justify-center shrink-0">
+              3
+            </div>
+            <p class="text-base sm:text-lg text-graphite leading-relaxed">
+              Подальше застосування BAGEL4, ProtParam та структурного моделювання оптимізує виділення пептиду і розкриє його потенціал для медицини.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================= -->
+      <!-- СЛАЙД 11: ФІНАЛЬНИЙ СЛАЙД -->
+      <!-- ========================================================= -->
+      <section class="slide p-6 sm:p-10 lg:p-14 items-center justify-center text-center relative overflow-y-auto slide-scroll" data-title="Дякую за увагу!">
+        <div class="pointer-events-none absolute -top-20 -left-20 w-80 h-80 rounded-full bg-olive/10 blur-3xl"></div>
+        <div class="pointer-events-none absolute -bottom-20 -right-20 w-80 h-80 rounded-full bg-sage-pale/60 blur-3xl"></div>
+
+        <div class="relative z-10 max-w-2xl space-y-6">
+          <div class="anim-item delay-1 mx-auto w-16 h-16 rounded-3xl bg-olive-soft border border-olive/25 flex items-center justify-center text-olive">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+
+          <h2 class="anim-item delay-2 font-display text-4xl sm:text-5xl lg:text-6xl font-extrabold text-graphite tracking-tight">
+            Дякую за увагу!
+          </h2>
+
+          <p class="anim-item delay-3 text-lg sm:text-xl text-olive font-medium">
+            Запитання та обговорення
+          </p>
+
+          <p class="anim-item delay-4 text-sm sm:text-base text-sage">
+            Катерина Петренко • ОНУ імені І. І. Мечникова
+          </p>
+
+          <div class="anim-item delay-5 pt-4">
+            <button id="btn-restart" type="button" class="inline-flex items-center gap-2.5 px-6 py-3 rounded-2xl bg-olive text-white font-display font-semibold text-sm sm:text-base hover:bg-olive-dark transition shadow-md cursor-pointer">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+              </svg>
+              Повернутися на початок
+            </button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Нижня панель керування презентацією -->
+  <footer class="relative z-20 px-3 pb-3 sm:px-6 sm:pb-4">
+    <div class="max-w-[1220px] mx-auto bg-white/90 backdrop-blur-md border border-sage-pale/80 rounded-2xl px-3 py-2.5 sm:px-5 sm:py-3 shadow-card flex flex-wrap items-center justify-between gap-3">
+
+      <!-- Кнопки Назад / Далі та індикатор -->
+      <div class="flex items-center gap-2">
+        <button id="btn-prev" type="button" aria-label="Попередній слайд" class="p-2.5 rounded-xl bg-olive-mist hover:bg-olive-soft text-graphite disabled:opacity-35 disabled:cursor-not-allowed transition cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+          </svg>
+        </button>
+
+        <span id="slide-counter" class="font-mono text-xs sm:text-sm font-semibold text-graphite min-w-[54px] text-center">
+          1 / 11
+        </span>
+
+        <button id="btn-next" type="button" aria-label="Наступний слайд" class="p-2.5 rounded-xl bg-olive hover:bg-olive-dark text-white disabled:opacity-35 disabled:cursor-not-allowed transition cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Клікабельний прогрес-бар -->
+      <div id="progress-track" role="progressbar" aria-valuemin="1" aria-valuemax="11" aria-valuenow="1" class="flex-1 min-w-[120px] max-w-md h-2.5 bg-olive-soft rounded-full overflow-hidden cursor-pointer relative" title="Перейти до слайду">
+        <div id="progress-fill" class="h-full bg-olive rounded-full transition-all duration-300" style="width: 9.09%;"></div>
+      </div>
+
+      <!-- Усі слайди та Повноекранний режим -->
+      <div class="flex items-center gap-2">
+        <button id="btn-overview" type="button" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-olive-mist hover:bg-olive-soft text-graphite text-xs sm:text-sm font-medium transition cursor-pointer">
+          <svg class="w-4 h-4 text-olive" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+          </svg>
+          <span>Усі слайди</span>
+        </button>
+
+        <button id="btn-fullscreen" type="button" aria-label="Повноекранний режим" class="p-2.5 rounded-xl bg-olive-mist hover:bg-olive-soft text-graphite transition cursor-pointer" title="Повноекранний режим">
+          <svg class="w-4 h-4 text-olive" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Модальне вікно сітки перегляду всіх слайдів -->
+  <div id="overview-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-graphite/40 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-3xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-sage-pale overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-sage-pale/70">
+        <h3 class="font-display font-bold text-lg text-graphite">Усі слайди презентації</h3>
+        <button id="btn-close-overview" type="button" class="p-2 rounded-xl hover:bg-olive-soft text-sage transition cursor-pointer" aria-label="Закрити">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div id="overview-grid" class="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 overflow-y-auto slide-scroll">
+        <!-- Картки прев'ю генеруються динамічно -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Скрипт логіки презентації, візуалізацій та анімованого фону -->
+  <script>
+    (function () {
+      const slides = Array.from(document.querySelectorAll('.slide'));
+      const totalSlides = slides.length;
+      let currentSlide = 0;
+
+      const btnPrev = document.getElementById('btn-prev');
+      const btnNext = document.getElementById('btn-next');
+      const btnRestart = document.getElementById('btn-restart');
+      const btnOverview = document.getElementById('btn-overview');
+      const btnCloseOverview = document.getElementById('btn-close-overview');
+      const btnFullscreen = document.getElementById('btn-fullscreen');
+      const slideCounter = document.getElementById('slide-counter');
+      const progressTrack = document.getElementById('progress-track');
+      const progressFill = document.getElementById('progress-fill');
+      const overviewModal = document.getElementById('overview-modal');
+      const overviewGrid = document.getElementById('overview-grid');
+      const stage = document.getElementById('presentation-stage');
+
+      /* =========================================================
+         1. ПЕРЕМИКАННЯ СЛАЙДІВ ТА СПЕЦИФІЧНІ АНІМАЦІЇ
+         ========================================================= */
+      function goToSlide(index) {
+        if (index < 0 || index >= totalSlides) return;
+
+        slides[currentSlide].classList.remove('active');
+        currentSlide = index;
+        slides[currentSlide].classList.add('active');
+
+        // Оновлення лічильника і прогрес-бару
+        slideCounter.textContent = `${currentSlide + 1} / ${totalSlides}`;
+        const pct = ((currentSlide + 1) / totalSlides) * 100;
+        progressFill.style.width = `${pct}%`;
+        progressTrack.setAttribute('aria-valuenow', String(currentSlide + 1));
+
+        btnPrev.disabled = currentSlide === 0;
+        btnNext.disabled = currentSlide === totalSlides - 1;
+
+        // Анімація шкал BLAST на 4 слайді (індекс 3)
+        const blastBars = document.querySelectorAll('.blast-bar-fill');
+        if (currentSlide === 3) {
+          blastBars.forEach(bar => { bar.style.width = '0%'; });
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              blastBars.forEach(bar => {
+                bar.style.width = bar.getAttribute('data-target') || '0%';
+              });
+            }, 140);
+          });
+        }
+      }
+
+      btnPrev.addEventListener('click', () => goToSlide(currentSlide - 1));
+      btnNext.addEventListener('click', () => goToSlide(currentSlide + 1));
+      if (btnRestart) {
+        btnRestart.addEventListener('click', () => goToSlide(0));
+      }
+
+      // Клік по прогрес-бару
+      progressTrack.addEventListener('click', (e) => {
+        const rect = progressTrack.getBoundingClientRect();
+        const clickRatio = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
+        const targetIndex = Math.min(Math.floor(clickRatio * totalSlides), totalSlides - 1);
+        goToSlide(targetIndex);
+      });
+
+      // Керування клавіатурою
+      document.addEventListener('keydown', (e) => {
+        if (!overviewModal.classList.contains('hidden')) {
+          if (e.key === 'Escape') closeOverview();
+          return;
+        }
+        if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+          e.preventDefault();
+          goToSlide(currentSlide + 1);
+        } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+          e.preventDefault();
+          goToSlide(currentSlide - 1);
+        } else if (e.key === 'Home') {
+          e.preventDefault();
+          goToSlide(0);
+        } else if (e.key === 'End') {
+          e.preventDefault();
+          goToSlide(totalSlides - 1);
+        }
+      });
+
+      // Свайпи для сенсорних екранів
+      let touchStartX = 0;
+      let touchStartY = 0;
+      stage.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+        touchStartY = e.changedTouches[0].screenY;
+      }, { passive: true });
+
+      stage.addEventListener('touchend', (e) => {
+        const dx = e.changedTouches[0].screenX - touchStartX;
+        const dy = e.changedTouches[0].screenY - touchStartY;
+        if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+          if (dx < 0) goToSlide(currentSlide + 1);
+          else goToSlide(currentSlide - 1);
+        }
+      }, { passive: true });
+
+      /* =========================================================
+         2. СІТКА ПЕРЕГЛЯДУ ВСІХ СЛАЙДІВ
+         ========================================================= */
+      function buildOverviewGrid() {
+        overviewGrid.innerHTML = '';
+        slides.forEach((slide, idx) => {
+          const title = slide.getAttribute('data-title') || `Слайд ${idx + 1}`;
+          const isFeatured = slide.getAttribute('data-featured') === 'true';
+          const isActive = idx === currentSlide;
+
+          const card = document.createElement('button');
+          card.type = 'button';
+          card.className = `text-left p-4 rounded-2xl border transition cursor-pointer flex flex-col justify-between min-h-[88px] ${
+            isActive
+              ? 'bg-olive-soft border-olive ring-2 ring-olive/25'
+              : isFeatured
+                ? 'bg-[#F3F7EE] border-olive/40 hover:border-olive'
+                : 'bg-olive-mist/60 border-sage-pale hover:border-olive/50 hover:bg-white'
+          }`;
+
+          card.innerHTML = `
+            <div class="flex items-center justify-between mb-2">
+              <span class="font-mono text-xs font-bold px-2 py-0.5 rounded-md ${
+                isActive ? 'bg-olive text-white' : 'bg-white text-olive border border-sage-pale'
+              }">${String(idx + 1).padStart(2, '0')}</span>
+              ${isFeatured ? '<span class="text-[10px] font-semibold uppercase tracking-wide text-olive">antiSMASH</span>' : ''}
+            </div>
+            <p class="font-display font-bold text-sm text-graphite leading-snug">${title}</p>
+          `;
+
+          card.addEventListener('click', () => {
+            goToSlide(idx);
+            closeOverview();
+          });
+          overviewGrid.appendChild(card);
+        });
+      }
+
+      function openOverview() {
+        buildOverviewGrid();
+        overviewModal.classList.remove('hidden');
+        overviewModal.classList.add('flex');
+      }
+
+      function closeOverview() {
+        overviewModal.classList.add('hidden');
+        overviewModal.classList.remove('flex');
+      }
+
+      btnOverview.addEventListener('click', openOverview);
+      btnCloseOverview.addEventListener('click', closeOverview);
+      overviewModal.addEventListener('click', (e) => {
+        if (e.target === overviewModal) closeOverview();
+      });
+
+      /* =========================================================
+         3. ПОВНОЕКРАННИЙ РЕЖИМ
+         ========================================================= */
+      btnFullscreen.addEventListener('click', () => {
+        try {
+          if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen();
+          } else {
+            document.exitFullscreen();
+          }
+        } catch (err) {
+          // Ігноруємо обмеження iFrame, якщо fullscreen заборонений
+        }
+      });
+
+      /* =========================================================
+         4. МАТРИЦЯ МНОЖИННОГО ВИРІВНЮВАННЯ (СЛАЙД 5)
+         ========================================================= */
+      function renderMSAMatrix() {
+        const container = document.getElementById('msa-matrix');
+        if (!container) return;
+
+        const sequences = [
+          { name: 'E. italicus ONU 547', seq: 'ATGCGTACCGTTAGCGTAACGTTAG', highlight: true },
+          { name: 'E. italicus SDKGW24', seq: 'ATGCGTACCGTTAGCGTAACGTTAG', highlight: false },
+          { name: 'E. italicus CAU7522', seq: 'ATGCGTACCGCTAGCGTAACGTTAG', highlight: false },
+          { name: 'E. faecalis ATCC   ', seq: 'ATGCGAACCGCTAGCGTAGCGTTCG', highlight: false },
+        ];
+
+        const colorMap = {
+          A: 'bg-[#E7EFE0] text-[#3F5122]',
+          T: 'bg-[#F5EFE0] text-[#7A6A33]',
+          G: 'bg-[#E2EFEF] text-[#2F5B59]',
+          C: 'bg-[#EDEBE8] text-[#57534E]',
+        };
+
+        let html = '';
+        sequences.forEach((row) => {
+          const cells = row.seq.split('').map((ch) =>
+            `<span class="inline-flex items-center justify-center w-5 h-6 rounded ${colorMap[ch] || ''} font-semibold text-[11px]">${ch}</span>`
+          ).join('');
+
+          html += `
+            <div class="flex items-center gap-3">
+              <span class="w-40 shrink-0 truncate ${row.highlight ? 'font-bold text-olive' : 'text-sage'} text-xs">${row.name}</span>
+              <div class="flex items-center gap-0.5">${cells}</div>
+            </div>
+          `;
+        });
+
+        // Рядок консенсусу (*)
+        const len = sequences[0].seq.length;
+        let consensusCells = '';
+        for (let i = 0; i < len; i++) {
+          const base = sequences[0].seq[i];
+          const allMatch = sequences.every((s) => s.seq[i] === base);
+          consensusCells += `<span class="inline-flex items-center justify-center w-5 h-5 font-bold text-xs ${allMatch ? 'text-olive' : 'text-sage-light'}">${allMatch ? '*' : '·'}</span>`;
+        }
+
+        html += `
+          <div class="flex items-center gap-3 pt-1">
+            <span class="w-40 shrink-0 text-[11px] uppercase tracking-wider text-sage">Консервативність</span>
+            <div class="flex items-center gap-0.5">${consensusCells}</div>
+          </div>
+        `;
+
+        container.innerHTML = html;
+      }
+
+      /* =========================================================
+         5. ІНТЕРАКТИВНИЙ КЛАСТЕР antiSMASH (СЛАЙД 7)
+         ========================================================= */
+      function initClusterInteractivity() {
+        const tooltip = document.getElementById('gene-tooltip');
+        const arrows = document.querySelectorAll('.gene-arrow');
+
+        const geneDescriptions = [
+          'Додатковий ген фланкуючої ділянки геному бере участь у базовому метаболізмі клітини.',
+          'Регуляторний ген контролює транскрипцію кластера та індукцію синтезу бактеріоцину.',
+          'Основний біосинтетичний ген кластера RiPP-like відповідає за синтез попередника нового бактеріоцину.',
+          'Захисний ген забезпечує імунітет клітини-продуцента до власного антимікробного пептиду.',
+          'Транспортний ген кодує ABC-транспортер для процесингу та експорту зрілого пептиду назовні.',
+          'Додатковий ген зворотної орієнтації обмежує межі біосинтетичного регіону Region 4.1.'
+        ];
+
+        arrows.forEach((arrow) => {
+          const idx = Number(arrow.getAttribute('data-gene'));
+          const activate = () => {
+            arrows.forEach(a => a.classList.remove('selected'));
+            arrow.classList.add('selected');
+            if (tooltip && geneDescriptions[idx]) {
+              tooltip.textContent = geneDescriptions[idx];
+            }
+          };
+          arrow.addEventListener('mouseenter', activate);
+          arrow.addEventListener('click', activate);
+        });
+      }
+
+      /* =========================================================
+         6. АНІМОВАНИЙ МОЛЕКУЛЯРНИЙ ФОН (HTML5 CANVAS)
+         ========================================================= */
+      function initMolecularCanvas() {
+        const canvas = document.getElementById('molecular-bg');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        let width = 0;
+        let height = 0;
+        let particles = [];
+
+        function resize() {
+          width = canvas.width = window.innerWidth;
+          height = canvas.height = window.innerHeight;
+          const count = Math.min(Math.floor((width * height) / 28000), 48);
+          particles = Array.from({ length: count }, () => ({
+            x: Math.random() * width,
+            y: Math.random() * height,
+            vx: (Math.random() - 0.5) * 0.35,
+            vy: (Math.random() - 0.5) * 0.35,
+            r: 2 + Math.random() * 2.5,
+          }));
+        }
+
+        function draw() {
+          ctx.clearRect(0, 0, width, height);
+
+          for (let i = 0; i < particles.length; i++) {
+            const p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+
+            if (p.x < 0 || p.x > width) p.vx *= -1;
+            if (p.y < 0 || p.y > height) p.vy *= -1;
+
+            // Вузли
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(85, 107, 47, 0.18)';
+            ctx.fill();
+
+            // Молекулярні зв'язки
+            for (let j = i + 1; j < particles.length; j++) {
+              const q = particles[j];
+              const dx = p.x - q.x;
+              const dy = p.y - q.y;
+              const dist = Math.hypot(dx, dy);
+              if (dist < 155) {
+                ctx.beginPath();
+                ctx.moveTo(p.x, p.y);
+                ctx.lineTo(q.x, q.y);
+                ctx.strokeStyle = `rgba(101, 114, 96, ${(1 - dist / 155) * 0.14})`;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+              }
+            }
+          }
+          requestAnimationFrame(draw);
+        }
+
+        window.addEventListener('resize', resize);
+        resize();
+        draw();
+      }
+
+      // Ініціалізація після завантаження сторінки
+      window.addEventListener('load', () => {
+        renderMSAMatrix();
+        initClusterInteractivity();
+        initMolecularCanvas();
+        goToSlide(0);
+      });
+    })();
+  </script>
+</body>
+</html>
